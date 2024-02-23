@@ -1,0 +1,67 @@
+Quentin Lauret
+
+Il faut aller dans le dossier aws, car à la racine ce sont mes tests avec docker.
+
+1- S3 Bucket 
+
+Ressource 1:
+J'ai mis une variable nom_prenom qui permet de personnalisé le bucket, j'ai mis par default mon nom prénom mais on peut le modifier quand on fait le tarraform apply -var nom_prenom="nouveau_nom_prenom"
+
+Je créer un bucket S3 avec le nom ynov-infracloud-${var.nom_prenom} et je le rends accessible en publique (askip déprécié). J'active le versonning pour une meilleure traçabilité et restauration.
+
+Ressource 2:
+Je télécharge l'image dans le bucket et je le rends publique (là pas déprécié).
+Ensuite je définie le type de l'objet dans le content type.
+
+Ressource 3:
+Je définie la politique S3 pour autoriser l'accès en lecture plubique à tous les objets du bucket.
+
+Les +:
+modulable et réutilisable parce que c'est fait avec terraform, et le versoning parce que je l'ai activé.
+Les - :
+on pourrait rajouter des tests mais surtout pourquoi pas restreindre l'ACL en accès publique pour un peu de sécurité.
+
+2- Launch template
+
+La variable du nom prénom comme tout à l'heure
+Je créer un launch template nommé launchTemplate-${var.nom_prenom}.
+Dans la ressource, je me déplace dans le répertorie noté ensuite je lance le service docker compose en mode détaché et reconstruit les images si besoin.
+La zone disponible sera en europe de l'ouest 1 et on l'associe à une adresse IP publique.
+
+Les +:
+c'est modulable et réutilisable comme d'habitute
+le script user data peut être personnalisé simplement pour installer et configurer les applications
+
+Les -:
+La sécurité, j'aurais pu rajouter un numéro de port par exmple pour limité l'accès full publique.
+
+3- Le sécurity group 
+
+Pareil la variable nom_prenom.
+Je créé un security group avec le nom securityGroup-${var.nom_prenom}.
+J'autorise le trafic entrant sur le port SSH (22) en TCP depuis n'importe quelle adresse IP (0.0.0.0/0).
+J'autorise le trafic entrant sur le port HTTP (80) en TCP depuis n'importe quelle adresse IP (0.0.0.0/0).
+J'autorise tout trafic sortant (protocole -1, ports 0-65535) vers n'importe quelle destination (0.0.0.0/0).
+
+Les améliorations à apporter :
+Je pourrais restreindre les règles d'entrée pourlimitez l'accès SSH et HTTP à des adresses IP spécifiques ou à des groupes de sécurité pour améliorer la sécurité.
+
+4 - L'autoscaling 
+
+Je configure un autoscaling group qui maintient 2 instances en fonctionnement en utilisant mon launch template fait juste avant. 
+Ensuite les instances sont redirigées vers le Target Group pour la répartition du trafic. 
+Les vérifications de santé EC2 surveillent la santé des instances et l'autoscaling gemini   roup ajuste automatiquement le nombre d'instances en fonction de l'état de santé et de la demande.
+
+5- Le load balancer
+
+J'autorise tout trafic entrant sur le port HTTP (80) depuis n'importe quelle adresse IP. En sortie j'autorise tout.
+Le loadbalncer est accèssible avec les 2 sous réseaux : aws_subnet.public_subnet_1.id, aws_subnet.public_subnet_2.id
+
+Sur le target group je configure les vérifications de santé sur le port 80 en HTTP.
+J'utilise le chemin d'accès "/" pour vérifier la santé des instances.
+De ce que j'ai compris sur la distribution du trafic, le load balancer dirige le trafic vers mon target group (mon_tg) via un action de réexpédition.
+
+
+
+PS: Je t'avoue en pratique j'ai pipé pas grand chose, alors chat gpt et gemini m'ont bien aider.
+
